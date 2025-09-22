@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Homicídios 3ª RISP</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        /* --- Reset e Estilos Globais --- */
+        :root {
+            --primary-bg: #f8f9fa;
+            --secondary-bg: #ffffff;
+            --sidebar-bg-start: #2c3e50;
+            --sidebar-bg-end: #34495e;
+            --sidebar-text: #ecf0f1;
+            --header-text: #2c3e50;
+            --text-color: #323130;
+            --text-muted: #7f8c8d;
+            --accent-color: #3498db;
+            --shadow-color: rgba(0,0,0,0.05);
+            --border-color: #e1e1e1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--primary-bg);
+            color: var(--text-color);
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* --- Tela de Login --- */
+        #login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--sidebar-bg-start);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .login-box {
+            background: var(--secondary-bg);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .login-box h2 {
+            margin-bottom: 25px;
+            color: var(--header-text);
+        }
+
+        .login-box .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .login-box label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+        
+        .login-box input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        
+        .login-box button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .login-box button:hover {
+            background-color: #2980b9;
+        }
+
+        #login-error {
+            color: #e74c3c;
+            margin-top: 15px;
+            height: 1.2em;
+        }
+
+        /* --- Estrutura Principal do Dashboard --- */
+        .dashboard-container {
+            display: none; /* Inicia oculto */
+            width: 100%;
+            height: 100vh;
+        }
+
+        /* --- Sidebar (Menu Lateral) --- */
+        .sidebar {
+            width: 250px;
+            background: linear-gradient(135deg, var(--sidebar-bg-start) 0%, var(--sidebar-bg-end) 100%);
+            color: var(--sidebar-text);
+            padding: 20px 0;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+            transition: margin-left 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar h2 {
+            padding: 0 20px 30px 20px;
+            text-align: center;
+            font-size: 1.4rem;
+            border-bottom: 1px solid #4a627a;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 20px 0;
+        }
+
+        .sidebar ul li a {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            color: var(--sidebar-text);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-size: 1.1rem;
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar ul li a:hover,
+        .sidebar ul li a.active {
+            background: #34495e;
+            color: white;
+            border-left-color: var(--accent-color);
+        }
+
+        /* --- Conteúdo Principal --- */
+        .main-content {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Cabeçalho --- */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: var(--secondary-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 8px var(--shadow-color);
+            margin-bottom: 20px;
+            flex-shrink: 0;
+        }
+
+        .header img {
+            height: 60px;
+        }
+
+        .header-title {
+            text-align: center;
+            color: var(--header-text);
+            flex-grow: 1;
+            margin: 0 15px;
+        }
+        .header-title h1 { font-size: 1.5rem; }
+        .header-title h2 { font-size: 1.1rem; font-weight: 400; }
+        .header-title p { font-size: 1rem; color: var(--text-muted); }
+
+        #menu-toggle {
+            display: none; /* Oculto em telas grandes */
+            background: none;
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            color: var(--header-text);
+        }
+
+        /* --- Filtros --- */
+        .filter-container {
+            background: var(--secondary-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px var(--shadow-color);
+            margin-bottom: 20px;
+        }
+        
+        .filter-container h3 {
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            color: var(--header-text);
+        }
+
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        .filter-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+        .filter-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .filter-buttons button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        #reset-filters { background-color: #e74c3c; color: white; }
+        #export-csv, #export-json { background-color: #27ae60; color: white; }
+
+        /* --- Conteúdo das Páginas e Gráficos --- */
+        .page { display: none; animation: fadeIn 0.5s; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .kpi-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .kpi-card {
+            background: var(--secondary-bg);
+            padding: 25px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 8px var(--shadow-color);
+        }
+        .kpi-card .value { font-size: 2.2rem; font-weight: 700; color: var(--header-text); }
+        .kpi-card .label { font-size: 1rem; color: var(--text-muted); margin-top: 5px; }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr; /* Padrão para mobile */
+            gap: 20px;
+        }
+        .chart-card {
+            background: var(--secondary-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px var(--shadow-color);
+        }
+        .chart-card h4 { font-size: 1.1rem; margin-bottom: 15px; color: var(--header-text); }
+        .chart-container { height: 350px; position: relative; }
+        .chart-container-large { height: 450px; }
+
+
+        /* --- Media Queries para Responsividade --- */
+
+        /* Tablets e telas maiores */
+        @media (min-width: 768px) {
+            .chart-grid {
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            }
+            .chart-card.full-width {
+                grid-column: 1 / -1;
+            }
+        }
+
+        /* Telas de celular */
+        @media (max-width: 767px) {
+            body { overflow: auto; }
+            .dashboard-container { flex-direction: column; height: auto; }
+            
+            .sidebar {
+                position: fixed;
+                left: -250px; /* Escondido por padrão */
+                top: 0;
+                height: 100%;
+                z-index: 200;
+                transition: left 0.3s ease-in-out;
+            }
+            .sidebar.open {
+                left: 0;
+            }
+
+            #menu-toggle {
+                display: block; /* Mostra o botão de menu */
+            }
+
+            .main-content { padding: 15px; }
+            
+            .header { padding: 10px 15px; }
+            .header img { height: 45px; }
+            .header-title h1 { font-size: 1.1rem; }
+            .header-title h2 { font-size: 0.9rem; }
+            .header-title p { font-size: 0.8rem; }
+            
+            .filters { grid-template-columns: 1fr; }
+            .filter-buttons { justify-content: center; }
+
+            .kpi-container { grid-template-columns: repeat(2, 1fr); }
+            .kpi-card .value { font-size: 1.8rem; }
+
+            .chart-container, .chart-container-large {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TELA DE LOGIN -->
+    <div id="login-screen">
+        <div class="login-box">
+            <h2>Acesso ao Dashboard</h2>
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="username">Usuário</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit">Entrar</button>
+                <p id="login-error"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- ESTRUTURA DO DASHBOARD -->
+    <div class="dashboard-container" id="dashboard-container">
+        <nav class="sidebar" id="sidebar">
+            <h2>Homicídios 3ª RISP</h2>
+            <ul id="nav-links">
+                <li><a href="#visao-geral" class="nav-link active">Visão Geral</a></li>
+                <li><a href="#perfil-ocorrencia" class="nav-link">Perfil da Ocorrência</a></li>
+                <li><a href="#vitimas-autoria" class="nav-link">Vítimas e Autoria</a></li>
+                <li><a href="#resolucao-situacao" class="nav-link">Resolução e Situação</a></li>
+            </ul>
+        </nav>
+
+        <main class="main-content">
+            <header class="header">
+                 <button id="menu-toggle">&#9776;</button> <!-- Ícone de Hamburger -->
+                <img src="data:image/jpeg;base64,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" alt="Logo COPOM">
+                <div class="header-title">
+                    <h1>3° Comando Regional da Polícia Militar</h1>
+                    <h2>Centro de Atendimento Policial Militar - COPOM</h2>
+                    <p>Análise Criminal - Controle de Homicídios</p>
+                </div>
+                <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAYGBgYHBgcICAcKCwoLCg8ODAwODxYQERAREBYiFRkVFRkVIh4kHhweJB42KiYmKjY+NDI0PkxERExfWl98fKcBBgYGBgcGBwgIBwoLCgsKDw4MDA4PFhAREBEQFiIVGRUVGRUiHiQeHB4kHjYqJCYqNj40MjQ+TERETF9aX3x8p//CABEIAMgAyAMBIgACEQEDEQH/xAAbAAEBAAMBAQEAAAAAAAAAAAAAAwQFBgIBB//aAAgBAQAAAAD7gAAAAAAAAAAAAAAAAAAAAAAAAABGq8N9WwAAcNX5npkAAcXXOX6UABxds5lpQAHF2zmWlAAcXbOZaUABxdc5fpQAHDU+Z6YABGq8N9WwAAAAAAAAAAAAAAAAAAAAAAAAB//xAAZAQEBAQEBAQAAAAAAAAAAAAAAAQIDBAX/2gAIAQIQAAAAA+403OADLWWWgDLWWWgDLWWWgDLWWWgDLWWWgDLWWWgDLWWWgDLWWWgD7jTc4AP/EABgBAQEBAQEAAAAAAAAAAAAAAAABAgME/9oACAECEAAAAA+403OADLWWWgDLWWWgDLWWWgDLWWWgDLWWWgDLWWWgDLWWWgDLWWWgD7jTc4AP/8QANRAAAQMCAwUGBgICAwAAAAAAAQACAwQRITESQVEQEyJhcYEUMlKRIjNAUoKhsWKCorLB0f/aAAgBAQABPwD/AOQ49c3+Q/zY9c3+Q/zY9c3+Q/zY9c3+Q/zY9c3+Q/zY9c3+Q/zY9c3+Q/zY9c3+Q/zY9c3+Q/wA2PXN/kP8ANj1z/wCQ/wA2PXN/kP8ANuFxcST1/wAzHrm/yH+bHrm/yH+bHrm/yH+bHrm/yH+bHrm/yH+bHrm/yH+bHrm/yH+bHrm/yH+bHrm/yH+bHrm/yH+bHrm/yH+bHrm/yAh/m3C5xcSet/wDmMfXN/kP82PXN/kP82PXN/kP82PXN/kP82PXN/kP82PXN/kP82PXN/kP82PXN/kP82PXN/kP82PXN/kP82PXN/wCQ/wA2PXN/kP8ANuFzi5x6/wDkR7rB/f8A0o91g/v/AKUe6wf3/wBKPdYP7/6Ue6wf3/0o91g/v/pR7rB/f/Sj3WD+/wDpR7rB/f8A0o91g/v/AKUe6wf3/wBKPdYP7/6UEtcHN6Ee9w/3n9KPdYP7/wClHusH9/8ASj3WD+/+lHusH9/9KPcx/wB5/Sj3WD+/+lHusH9/9KPdYP7/AOlHusH9/wDSoLWuDhzB//EABwRAAIDAQEBAQAAAAAAAAAAAAABAhETEiExQf/aAAgBAQABPxA9b/bF48iO2S82z6L+2Lx5Edsl5tn0X9sXjyI7ZLyvX/q/tjwY8CO2z8y9e/7Y8GPIjts/MvXv+2PBjyI7bLz83r/2PAjwI7bLyv/U9b/bF48iO2S82z6L+2Lx5Edsl5tn0X9sXjyI7ZLyvX/q/tjwY8CO2z8y9e/7Y8GPIjts/MvXv+2PBjyI7bLz83r/2PAjwI7bLyv8A1Pr8UvF4v8Xil+C/xS8X+LxS/Bf4peL/ABeKX4L/ABS8X+LxS/Bf4peL/F4pfgv8UvF/i8UvwX+KXi/xeKX4L/FLxf4vFL8F/il4v8Xil+C/xS8X+LxS/Bf/xAAmEAEAAgIBBAEFAQEBAAAAAAABABEhMUFRYXEQgSCRoTCxwfDB4f/aAAgBAQABPyH7iYf+R//Z" alt="Logo 3ª CRPM">
+            </header>
+
+            <div class="filter-container">
+                <h3>Filtros Interativos</h3>
+                <div class="filters">
+                    <div class="filter-group"><label for="filter-municipio">Município</label><select id="filter-municipio"></select></div>
+                    <div class="filter-group"><label for="filter-unidade">Unidade</label><select id="filter-unidade"></select></div>
+                    <div class="filter-group"><label for="filter-instrumento">Instrumento</label><select id="filter-instrumento"></select></div>
+                    <div class="filter-group"><label for="filter-ambiente">Ambiente</label><select id="filter-ambiente"></select></div>
+                    <div class="filter-group"><label for="filter-ano">Ano</label><select id="filter-ano"></select></div>
+                </div>
+                <div class="filter-buttons">
+                    <button id="reset-filters">Limpar Filtros</button>
+                    <button id="export-csv">Exportar CSV</button>
+                    <button id="export-json">Exportar JSON</button>
+                </div>
+            </div>
+
+            <div class="page-content">
+                <!-- Páginas de conteúdo -->
+                <div id="visao-geral" class="page active">
+                    <div class="kpi-container">
+                        <div class="kpi-card"><div id="kpi-total" class="value">0</div><div class="label">Total de Homicídios</div></div>
+                        <div class="kpi-card"><div id="kpi-resolvidos" class="value">0</div><div class="label">Casos Resolvidos</div></div>
+                        <div class="kpi-card"><div id="kpi-pendentes" class="value">0</div><div class="label">Casos Pendentes</div></div>
+                        <div class="kpi-card"><div id="kpi-taxa-resolucao" class="value">0%</div><div class="label">% de Resolução</div></div>
+                    </div>
+                    <div class="chart-grid">
+                        <div class="chart-card"><h4>Homicídios por Mês</h4><div class="chart-container"><canvas id="chart-homicidios-mes"></canvas></div></div>
+                        <div class="chart-card"><h4>Ranking de Municípios</h4><div class="chart-container"><canvas id="chart-ranking-municipios"></canvas></div></div>
+                    </div>
+                </div>
+
+                <div id="perfil-ocorrencia" class="page">
+                    <div class="chart-grid">
+                        <div class="chart-card"><h4>Distribuição por Instrumento</h4><div class="chart-container"><canvas id="chart-instrumento"></canvas></div></div>
+                        <div class="chart-card"><h4>Distribuição por Ambiente</h4><div class="chart-container"><canvas id="chart-ambiente"></canvas></div></div>
+                        <div class="chart-card full-width"><h4>Motivação da Ocorrência</h4><div class="chart-container chart-container-large"><canvas id="chart-motivacao"></canvas></div></div>
+                    </div>
+                </div>
+
+                <div id="vitimas-autoria" class="page">
+                     <div class="chart-grid">
+                        <div class="chart-card"><h4>Vítimas por Gênero</h4><div class="chart-container"><canvas id="chart-genero"></canvas></div></div>
+                        <div class="chart-card"><h4>Situação da Autoria</h4><div class="chart-container"><canvas id="chart-autoria"></canvas></div></div>
+                        <div class="chart-card full-width"><h4>Relação Motivação vs Gênero</h4><div class="chart-container chart-container-large"><canvas id="chart-motivacao-genero"></canvas></div></div>
+                    </div>
+                </div>
+
+                <div id="resolucao-situacao" class="page">
+                    <div class="chart-grid">
+                        <div class="chart-card"><h4>Resolução dos Casos</h4><div class="chart-container"><canvas id="chart-resolucao"></canvas></div></div>
+                        <div class="chart-card"><h4>Resposta Policial</h4><div class="chart-container"><canvas id="chart-resposta"></canvas></div></div>
+                        <div class="chart-card full-width"><h4>Comparativo de Resolução por Unidade</h4><div class="chart-container chart-container-large"><canvas id="chart-resolucao-unidade"></canvas></div></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script>
+        const embeddedData = [
+            {"ORDEM":1,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":39602952,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"03/01/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":2,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":39629101,"MUNICIPIO":"GOIANÁPOLIS","UNIDADE":"24ª CIPM","DATA DO FATO":"04/01/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"IMÓVEL RESIDENCIAL","MOTIVAÇÃO":"BRIGA DE VIZINHOS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":3,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":39637338,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"05/01/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"IMÓVEL RESIDENCIAL","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"OPR CONJUNTA","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":4,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":39723704,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"11/01/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":5,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":39765998,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"13/01/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"DESCONHECida","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":6,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":39830835,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"18/01/2025","INSTRUMENTO":"OUTROS","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":7,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":40151177,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"07/02/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"DESCONHECIDA","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"EM MENOS DE 24 HORAS","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":8,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":40502047,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"28/02/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"LOCAL PÚBLICO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":9,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":40669298,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"09/03/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":10,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":40741428,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"14/03/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"DESCONHECIDA","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":11,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":40748197,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"14/03/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"DESCONHECIDA","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":12,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":40751910,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"14/03/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"FEMININO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"CUMPRIU MAND DE PRISÃO","RESPOSTA":"APÓS A INVESTIGAÇÃO","DILIGÊNCIA":"PCGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":13,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":40753063,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"14/03/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":14,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":40764994,"MUNICIPIO":"VIANÓPOLIS","UNIDADE":"47ª CIPM","DATA DO FATO":"15/03/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"CIÚMES","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"CUMPRIU MAND DE PRISÃO","RESPOSTA":"EM MENOS DE 24 HORAS","DILIGÊNCIA":"PCGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":15,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":40788175,"MUNICIPIO":"CORUMBÁ DE GOIÁS","UNIDADE":"37º BPM","DATA DO FATO":"15/03/2025","INSTRUMENTO":"OUTROS","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"DESCONHECIDA","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"NA MESMA SEMANA","DILIGÊNCIA":"PCGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":16,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":41107135,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"05/04/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":17,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":41221773,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"12/04/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":18,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":41263884,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"14/04/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"EM MENOS DE 24 HORAS","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":19,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":41478158,"MUNICIPIO":"PIRENÓPOLIS","UNIDADE":"37º BPM","DATA DO FATO":"28/04/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"CIÚMES","Nº DE VÍTIMAS":1,"GÊNERO":"FEMININO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":20,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":41595115,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"04/05/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUToria":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":21,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":41768294,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"16/05/2025","INSTRUMENTO":"OUTROS","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"DESCONHECIDA","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":22,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":41834925,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"20/05/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":23,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":41910671,"MUNICIPIO":"PIRENÓPOLIS","UNIDADE":"37º BPM","DATA DO FATO":"24/05/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"DESCONHECIDA","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":24,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42024177,"MUNICIPIO":"TEREZÓPOLIS DE GOIÁS","UNIDADE":"24ª CIPM","DATA DO FATO":"01/06/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"DESCONHECIDA","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"FORAGIDO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"OPR CONJUNTA","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":25,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42028072,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"01/06/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"CIÚMES","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"CUMPRIU MAND DE PRISÃO","RESPOSTA":"APÓS A INVESTIGAÇÃO","DILIGÊNCIA":"PCGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":26,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42044044,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"02/06/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"CIÚMES","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":27,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42407551,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"28/06/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":28,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42431189,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"29/06/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"LOCAL PÚBLICO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":29,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42557991,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"05/07/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"LOCAL PÚBLICO","MOTIVAÇÃO":"TRÁFICO DE DROGAS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":30,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42562104,"MUNICIPIO":"LEOPOLDO DE BULHÕES","UNIDADE":"47ª CIPM","DATA DO FATO":"05/07/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":31,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42656014,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"11/07/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"FEMININO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITuação ATUAL":"RESOLVIDO"},
+            {"ORDEM":32,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42681044,"MUNICIPIO":"CAMPO LIMPO DE GOIÁS","UNIDADE":"24ª CIPM","DATA DO FATO":"13/07/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"BRIGA DE BAR","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"RESPOSTA IMEDIATA / APF","DILIGÊNCIA":"OPR CONJUNTA","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":33,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42770853,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"18/07/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF EM","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":34,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42823136,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"21/07/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"LOCAL PÚBLICO","MOTIVAÇÃO":"TRÁFICO DE DROGAS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":35,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42827441,"MUNICIPIO":"LEOPOLDO DE BULHÕES","UNIDADE":"47ª CIPM","DATA DO FATO":"22/07/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"CIÚMES","Nº DE VÍTIMAS":1,"GÊNERO":"FEMININO","AUToria":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":36,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42858968,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"24/07/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":37,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42866826,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"25/07/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":38,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42898126,"MUNICIPIO":"TEREZÓPOLIS DE GOIÁS","UNIDADE":"24ª CIPM","DATA DO FATO":"27/07/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"DESCONHECIDA","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":39,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":42898715,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"27/07/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"EM MENOS DE 24 HORAS","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":40,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43003688,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"02/08/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"FEMININO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":41,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43034172,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"05/08/2025","INSTRUMENTO":"OUTROS","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":42,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43065835,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"07/08/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":43,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43116108,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"10/08/2025","INSTRUMENTO":"OUTROS","AMBIENTE":"SEM ACESSO","MOTIVAÇÃO":"DESCONHECIDA","Nº DE VÍTIMAS":1,"GÊNERO":"FEMININO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":44,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43244894,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"18/08/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"IMÓVEL RESIDENCIAL","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"EM MENOS DE 24 HORAS","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":45,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43303595,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"21/08/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"LOCAL PÚBLICO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":46,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43483885,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"28º BPM","DATA DO FATO":"02/09/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"LOCAL PÚBLICO","MOTIVAÇÃO":"CIÚMES","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":47,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43560658,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"06/09/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"LOCAL PÚBLICO","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"FEMININO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":48,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43574885,"MUNICIPIO":"SILVÂNIA","UNIDADE":"47ª CIPM","DATA DO FATO":"07/09/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"IMÓVEL RESIDENCIAL","MOTIVAÇÃO":"DESCONHECIDA","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":49,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43592653,"MUNICIPIO":"GOIANÁPOLIS","UNIDADE":"24ª CIPM","DATA DO FATO":"09/09/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"ESTABELECIMENTO COMERCIAL/SERVIÇOS","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"FEMININO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":50,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43694088,"MUNICIPIO":"ANÁPOLIS","UNIDADE":"4º BPM","DATA DO FATO":"16/09/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"LOCAL PÚBLICO","MOTIVAÇÃO":"TRÁFICO DE DROGAS","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"INCERTA","RESOLUÇÃO":"EM APURAÇÃO","RESPOSTA":"PENDENTE","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"EM DILIGÊNCIAS"},
+            {"ORDEM":51,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43781662,"MUNICIPIO":"GAMELEIRA DE GOIÁS","UNIDADE":"47ª CIPM","DATA DO FATO":"20/09/2025","INSTRUMENTO":"ARMA DE FOGO","AMBIENTE":"LOCAL PÚBLICO","MOTIVAÇÃO":"DESCONHECIDA","Nº DE VÍTIMAS":1,"GÊNERO":"MASCULINO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"EM MENOS DE 24 HORAS","DILIGÊNCIA":"OPR CONJUNTA","SITUAÇÃO ATUAL":"RESOLVIDO"},
+            {"ORDEM":52,"GRUPO REATIVAS":"HOMICÍDIO DOLOSO","NÚMERO DO RAI":43801869,"MUNICIPIO":"LEOPOLDO DE BULHÕES","UNIDADE":"47ª CIPM","DATA DO FATO":"22/09/2025","INSTRUMENTO":"ARMA BRANCA","AMBIENTE":"IMÓVEL RESIDENCIAL","MOTIVAÇÃO":"OUTROS","Nº DE VÍTIMAS":1,"GÊNERO":"FEMININO","AUTORIA":"DEFINIDA","RESOLUÇÃO":"PRESO EM FLAGRANTE","RESPOSTA":"IMEDIATA / APF","DILIGÊNCIA":"PMGO","SITUAÇÃO ATUAL":"RESOLVIDO"}
+        ];
+
+        // --- INÍCIO DO SCRIPT DO DASHBOARD ---
+
+        // Variáveis globais
+        let fullData = [];
+        const chartInstances = {};
+
+        // Configurações globais do Chart.js
+        Chart.defaults.font.family = "'Segoe UI', 'Helvetica Neue', 'Arial', sans-serif";
+        Chart.defaults.plugins.legend.position = 'bottom';
+        Chart.defaults.responsive = true;
+        Chart.defaults.maintainAspectRatio = false;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Lógica de Login
+            const loginForm = document.getElementById('login-form');
+            loginForm.addEventListener('submit', function(event) {
+                event.preventDefault();
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                const errorP = document.getElementById('login-error');
+
+                if (username === 'analisecriminal' && password === 'homicidios3risp') {
+                    document.getElementById('login-screen').style.display = 'none';
+                    const dashboardContainer = document.getElementById('dashboard-container');
+                    dashboardContainer.style.display = 'flex'; // Mostra o dashboard
+                    initializeDashboard(); // Inicia o dashboard APÓS o login
+                } else {
+                    errorP.textContent = 'Usuário ou senha inválidos.';
+                }
+            });
+        });
+
+        function initializeDashboard() {
+            try {
+                fullData = processData(validateData(embeddedData));
+                populateFilters();
+                setupEventListeners();
+                updateDashboard();
+            } catch (error) {
+                console.error('Falha ao inicializar o dashboard:', error);
+                alert('Ocorreu um erro ao carregar o dashboard.');
+            }
+        }
+
+        function processData(data) {
+             return data.map(row => {
+                const dateParts = row['DATA DO FATO'] ? row['DATA DO FATO'].split('/') : null;
+                const date = dateParts && dateParts.length === 3 ? new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0])) : null;
+                
+                let resolucaoNormalizada = 'Não';
+                const resolucao = (row['SITUAÇÃO ATUAL'] || '').toLowerCase();
+                if (resolucao.includes('resolvido')) {
+                    resolucaoNormalizada = 'Sim';
+                }
+
+                return {
+                    ...row,
+                    'Município': row['MUNICIPIO'],
+                    'Data do fato': date,
+                    'Ano': date ? date.getFullYear() : null,
+                    'Mês': date ? date.getMonth() : null, // 0-11
+                    'Instrumento': row['INSTRUMENTO'],
+                    'ResoluçãoNormalizada': resolucaoNormalizada
+                };
+            }).filter(row => row['Data do fato']);
+        }
+        
+        function setupEventListeners() {
+            // Navegação entre páginas
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                    document.querySelector(link.getAttribute('href')).classList.add('active');
+                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                    if (window.innerWidth <= 767) { // Fecha o menu no mobile ao clicar
+                        document.getElementById('sidebar').classList.remove('open');
+                    }
+                });
+            });
+
+            // Filtros
+            document.querySelectorAll('.filter-group select').forEach(select => {
+                select.addEventListener('change', updateDashboard);
+            });
+            
+            document.getElementById('reset-filters').addEventListener('click', () => {
+                document.querySelectorAll('.filter-group select').forEach(select => select.value = 'todos');
+                updateDashboard();
+            });
+
+            // Exportação de dados
+            document.getElementById('export-csv').addEventListener('click', () => exportData('csv'));
+            document.getElementById('export-json').addEventListener('click', () => exportData('json'));
+            
+            // Menu Hamburger (Mobile)
+            document.getElementById('menu-toggle').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.toggle('open');
+            });
+        }
+
+        function populateFilters() {
+            const filterKeys = {
+                'filter-municipio': 'Município', 'filter-unidade': 'UNIDADE',
+                'filter-instrumento': 'Instrumento', 'filter-ambiente': 'AMBIENTE', 'filter-ano': 'Ano'
+            };
+
+            for (const [selectId, dataKey] of Object.entries(filterKeys)) {
+                const select = document.getElementById(selectId);
+                const options = ['Todos', ...new Set(fullData.map(item => item[dataKey]).filter(Boolean))].sort((a, b) => (a === 'Todos' ? -1 : b === 'Todos' ? 1 : String(a).localeCompare(String(b))));
+                select.innerHTML = options.map(opt => `<option value="${String(opt).toLowerCase()}">${opt}</option>`).join('');
+            }
+        }
+        
+        function getFilteredData() {
+            const filters = {
+                municipio: document.getElementById('filter-municipio').value,
+                unidade: document.getElementById('filter-unidade').value,
+                instrumento: document.getElementById('filter-instrumento').value,
+                ambiente: document.getElementById('filter-ambiente').value,
+                ano: document.getElementById('filter-ano').value
+            };
+
+            return fullData.filter(d => 
+                (filters.municipio === 'todos' || (d['Município'] || '').toLowerCase() === filters.municipio) &&
+                (filters.unidade === 'todos' || (d['UNIDADE'] || '').toLowerCase() === filters.unidade) &&
+                (filters.instrumento === 'todos' || (d['Instrumento'] || '').toLowerCase() === filters.instrumento) &&
+                (filters.ambiente === 'todos' || (d['AMBIENTE'] || '').toLowerCase() === filters.ambiente) &&
+                (filters.ano === 'todos' || d['Ano'] == filters.ano)
+            );
+        }
+
+        function updateDashboard() {
+            const filteredData = getFilteredData();
+            updateKPIs(filteredData);
+            updateCharts(filteredData);
+        }
+
+        function updateKPIs(data) {
+            const total = data.length;
+            const resolvidos = data.filter(d => d.ResoluçãoNormalizada === 'Sim').length;
+            const taxaResolucao = total > 0 ? ((resolvidos / total) * 100).toFixed(1) + '%' : '0%';
+
+            document.getElementById('kpi-total').textContent = total;
+            document.getElementById('kpi-resolvidos').textContent = resolvidos;
+            document.getElementById('kpi-pendentes').textContent = total - resolvidos;
+            document.getElementById('kpi-taxa-resolucao').textContent = taxaResolucao;
+        }
+        
+        function updateCharts(data) {
+            renderTimeChart('chart-homicidios-mes', data);
+            renderRankingChart('chart-ranking-municipios', data, 'Município');
+            renderDonutChart('chart-instrumento', data, 'Instrumento');
+            renderDonutChart('chart-ambiente', data, 'AMBIENTE');
+            renderBarChart('chart-motivacao', data, 'MOTIVAÇÃO', false);
+            renderDonutChart('chart-genero', data, 'GÊNERO');
+            renderPieChart('chart-autoria', data, 'AUTORIA');
+            renderStackedBarChart('chart-motivacao-genero', data, 'MOTIVAÇÃO', 'GÊNERO');
+            renderPieChart('chart-resolucao', data, 'ResoluçãoNormalizada', true);
+            renderDonutChart('chart-resposta', data, 'RESPOSTA');
+            renderResolutionComparisonChart('chart-resolucao-unidade', data, 'UNIDADE');
+        }
+
+        function renderChart(canvasId, type, chartData, options = {}) {
+            if (chartInstances[canvasId]) {
+                chartInstances[canvasId].destroy();
+            }
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            chartInstances[canvasId] = new Chart(ctx, { type, data: chartData, options });
+        }
+
+        function getCounts(data, key) {
+            return data.reduce((acc, item) => {
+                const value = item[key] || 'Não Informado';
+                acc[value] = (acc[value] || 0) + 1;
+                return acc;
+            }, {});
+        }
+        
+        const chartColors = ['#3498db', '#e74c3c', '#9b59b6', '#f1c40f', '#2ecc71', '#1abc9c', '#e67e22'];
+
+        function renderTimeChart(canvasId, data) {
+            const monthlyCounts = Array(12).fill(0);
+            data.forEach(d => { if (d['Mês'] != null) monthlyCounts[d['Mês']]++; });
+            const labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            renderChart(canvasId, 'bar', {
+                labels,
+                datasets: [{ label: 'Homicídios', data: monthlyCounts, backgroundColor: '#3498db' }]
+            });
+        }
+        
+        function renderRankingChart(canvasId, data, key) {
+            const counts = getCounts(data, key);
+            const sorted = Object.entries(counts).sort(([,a],[,b]) => b-a).slice(0, 10);
+            renderChart(canvasId, 'bar', {
+                labels: sorted.map(item => item[0]),
+                datasets: [{ label: 'Ocorrências', data: sorted.map(item => item[1]), backgroundColor: '#9b59b6' }]
+            }, { indexAxis: 'y' });
+        }
+
+        function renderDonutChart(canvasId, data, key) {
+            const counts = getCounts(data, key);
+            renderChart(canvasId, 'doughnut', {
+                labels: Object.keys(counts),
+                datasets: [{ data: Object.values(counts), backgroundColor: chartColors }]
+            });
+        }
+        
+        function renderPieChart(canvasId, data, key, isResolution = false) {
+            const counts = getCounts(data, key);
+            let labels = Object.keys(counts);
+            let colors = chartColors;
+            if (isResolution) {
+                labels = labels.map(l => l === 'Sim' ? 'Resolvido' : 'Pendente');
+                colors = labels.map(l => l.includes('Resolvido') ? '#2ecc71' : '#e74c3c');
+            }
+            renderChart(canvasId, 'pie', {
+                labels,
+                datasets: [{ data: Object.values(counts), backgroundColor: colors }]
+            });
+        }
+        
+        function renderBarChart(canvasId, data, key, isHorizontal = true) {
+            const counts = getCounts(data, key);
+            const sorted = Object.entries(counts).sort(([,a],[,b]) => b-a);
+            renderChart(canvasId, 'bar', {
+                labels: sorted.map(item => item[0]),
+                datasets: [{ label: 'Contagem', data: sorted.map(item => item[1]), backgroundColor: '#e67e22' }]
+            }, { indexAxis: isHorizontal ? 'y' : 'x' });
+        }
+        
+        function renderStackedBarChart(canvasId, data, stackKey, groupKey) {
+            const groupedData = data.reduce((acc, curr) => {
+                const stack = curr[stackKey] || 'Não Informado';
+                const group = curr[groupKey] || 'Não Informado';
+                if (!acc[stack]) acc[stack] = {};
+                acc[stack][group] = (acc[stack][group] || 0) + 1;
+                return acc;
+            }, {});
+
+            const labels = Object.keys(groupedData);
+            const groups = [...new Set(data.map(item => item[groupKey] || 'Não Informado'))];
+            
+            const datasets = groups.map((group, i) => ({
+                label: group,
+                data: labels.map(label => groupedData[label][group] || 0),
+                backgroundColor: chartColors[i % chartColors.length]
+            }));
+
+            renderChart(canvasId, 'bar', { labels, datasets }, {
+                indexAxis: 'y',
+                scales: { x: { stacked: true }, y: { stacked: true } }
+            });
+        }
+        
+        function renderResolutionComparisonChart(canvasId, data, key) {
+            const unitData = data.reduce((acc, curr) => {
+                const unit = curr[key] || 'Não Informada';
+                if (!acc[unit]) acc[unit] = { resolved: 0, pending: 0 };
+                curr.ResoluçãoNormalizada === 'Sim' ? acc[unit].resolved++ : acc[unit].pending++;
+                return acc;
+            }, {});
+            
+            const labels = Object.keys(unitData);
+            renderChart(canvasId, 'bar', {
+                labels,
+                datasets: [
+                    { label: 'Resolvido', data: labels.map(l => unitData[l].resolved), backgroundColor: '#2ecc71' },
+                    { label: 'Pendente', data: labels.map(l => unitData[l].pending), backgroundColor: '#e74c3c' }
+                ]
+            }, { scales: { x: { stacked: true }, y: { stacked: true } } });
+        }
+
+        // Funções utilitárias
+        function exportData(format) {
+            const filteredData = getFilteredData();
+            if (format === 'csv') {
+                const csv = Papa.unparse(filteredData);
+                downloadFile(csv, 'homicidios_data.csv', 'text/csv;charset=utf-8;');
+            } else if (format === 'json') {
+                const json = JSON.stringify(filteredData, null, 2);
+                downloadFile(json, 'homicidios_data.json', 'application/json');
+            }
+        }
+
+        function downloadFile(content, filename, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        }
+
+        function validateData(data) {
+            const requiredFields = ['MUNICIPIO', 'DATA DO FATO', 'INSTRUMENTO'];
+            const validRows = data.filter(row => requiredFields.every(field => row[field] && String(row[field]).trim()));
+            return validRows;
+        }
+
+    </script>
+</body>
+</html>
+
